@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>✿ My Content Hub ✿</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Fredoka:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- ===== Header ===== -->
+    <header class="hero">
+      <div class="hero-text">
+        <h1>✿ My Content Hub</h1>
+        <p id="greeting">Hello, lovely ♡</p>
+      </div>
+      <div class="hero-date">
+        <span id="today-date"></span>
+        <span id="today-clock" class="clock"></span>
+      </div>
+    </header>
+
+    <!-- ===== Top row: To-dos ===== -->
+    <section class="grid grid-3">
+      <!-- DAILY -->
+      <div class="card todo-card" data-list="daily">
+        <div class="card-head">
+          <h2>☀️ Today</h2>
+          <span class="pill" id="daily-progress">0%</span>
+        </div>
+        <p class="reset-note">Resets at midnight · logs to your heatmap</p>
+        <ul class="todo-list" id="daily-list"></ul>
+        <form class="add-form" data-list="daily">
+          <input type="text" placeholder="Add a task for today…" maxlength="120" />
+          <button type="submit" aria-label="Add">＋</button>
+        </form>
+      </div>
+
+      <!-- WEEKLY -->
+      <div class="card todo-card" data-list="weekly">
+        <div class="card-head">
+          <h2>📅 This Week</h2>
+          <span class="pill" id="weekly-progress">0%</span>
+        </div>
+        <p class="reset-note">Resets every Monday</p>
+        <ul class="todo-list" id="weekly-list"></ul>
+        <form class="add-form" data-list="weekly">
+          <input type="text" placeholder="Add a task for this week…" maxlength="120" />
+          <button type="submit" aria-label="Add">＋</button>
+        </form>
+      </div>
+
+      <!-- MONTHLY -->
+      <div class="card todo-card" data-list="monthly">
+        <div class="card-head">
+          <h2>🗓️ This Month</h2>
+          <span class="pill" id="monthly-progress">0%</span>
+        </div>
+        <p class="reset-note">Resets on the 1st</p>
+        <ul class="todo-list" id="monthly-list"></ul>
+        <form class="add-form" data-list="monthly">
+          <input type="text" placeholder="Add a task for this month…" maxlength="120" />
+          <button type="submit" aria-label="Add">＋</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- ===== Heatmap ===== -->
+    <section class="card heatmap-card">
+      <div class="card-head">
+        <h2>🌸 Completion Heatmap</h2>
+        <span class="pill" id="streak-pill">0 day streak</span>
+      </div>
+      <p class="reset-note">How much of each day's "Today" list you finished</p>
+      <div class="heatmap-wrap">
+        <div class="heatmap" id="heatmap"></div>
+      </div>
+      <div class="heatmap-legend">
+        <span>Less</span>
+        <i class="lvl lvl-0"></i><i class="lvl lvl-1"></i><i class="lvl lvl-2"></i><i class="lvl lvl-3"></i><i class="lvl lvl-4"></i>
+        <span>More</span>
+      </div>
+    </section>
+
+    <!-- ===== Brand tracker ===== -->
+    <section class="card">
+      <div class="card-head">
+        <h2>💼 Brand Tracker</h2>
+        <span class="pill pill-soft" id="brand-total">$0 expected</span>
+      </div>
+      <p class="reset-note">Track posts, rates, and what you can expect to make</p>
+      <div class="table-wrap">
+        <table class="brand-table">
+          <thead>
+            <tr>
+              <th>Brand</th>
+              <th>Posts done</th>
+              <th>Posts owed</th>
+              <th>Rate / post</th>
+              <th>Earned</th>
+              <th>Expected total</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="brand-body"></tbody>
+        </table>
+      </div>
+      <button class="add-row-btn" id="add-brand">＋ Add brand</button>
+    </section>
+
+    <!-- ===== Income targets ===== -->
+    <section class="card">
+      <div class="card-head">
+        <h2>🎯 Income Targets</h2>
+        <span class="pill pill-soft" id="current-income">$0 so far</span>
+      </div>
+      <p class="reset-note">Each tier adds on top of the one before it · totals calculate automatically</p>
+      <div class="grid grid-3 tiers" id="tiers"></div>
+    </section>
+
+    <footer class="foot">
+      <span>Made with ♡ · your data is saved privately in this browser</span>
+      <button id="reset-all" class="ghost-btn">Reset everything</button>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
