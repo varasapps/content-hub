@@ -39,7 +39,7 @@ function defaultState() {
       EOY: { items: [], start: startOfMonthISO(), end: new Date().getFullYear() + '-12-31' } },
     periods: { daily: '', weekly: '', monthly: '' },
     heatmap: {},
-    categories: ['Personal Brand', 'Unlocked', 'Payments/Sponsors'],
+    categories: ['Personal Brand', 'Current Campaigns', 'Payments/Sponsors'],
     activeCategory: 'ALL',
     scoped: [],      // { id, text, cat, bucket, done, priority }
     socials: [
@@ -94,7 +94,32 @@ function load() {
   } catch (e) { return defaultState(); }
 }
 let state = load();
+ensureCategories();
 function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+
+// keep the category set sensible for existing saved data
+function ensureCategories() {
+  if (!Array.isArray(state.categories)) state.categories = [];
+  // rename the old reference-style category to the new one
+  if (state.categories.includes('Unlocked') && !state.categories.includes('Current Campaigns')) {
+    state.categories = state.categories.map(c => (c === 'Unlocked' ? 'Current Campaigns' : c));
+    (state.scoped || []).forEach(t => { if (t.cat === 'Unlocked') t.cat = 'Current Campaigns'; });
+  }
+  // make sure the three core tabs exist and sit first, in order
+  const core = ['Personal Brand', 'Current Campaigns', 'Payments/Sponsors'];
+  const extras = state.categories.filter(c => !core.includes(c));
+  state.categories = [...core, ...extras];
+  if (!state.categories.includes(state.activeCategory) && state.activeCategory !== 'ALL') state.activeCategory = 'ALL';
+}
+
+// show only the sections that belong to the active tab (ALL shows everything)
+function applyTabVisibility() {
+  const active = state.activeCategory;
+  document.querySelectorAll('[data-tabs]').forEach(sec => {
+    const tabs = sec.dataset.tabs.split(',').map(s => s.trim());
+    sec.style.display = (active === 'ALL' || tabs.includes(active)) ? '' : 'none';
+  });
+}
 
 const $ = sel => document.querySelector(sel);
 const money = n => '$' + (Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -303,6 +328,7 @@ function renderCategories() {
   });
   wrap.appendChild(add);
   $('#scope-name').textContent = state.activeCategory.toUpperCase();
+  applyTabVisibility();
 }
 
 const PRIOS = ['p-green', 'p-yellow', 'p-red'];
