@@ -15,6 +15,22 @@ function defaultState() {
     brands: [
       { name: '', done: 0, owed: 0, rate: 0 }
     ],
+    // outreach list — pre-filled with UGC brands from saved reels
+    pitchlist: [
+      { name: 'Cecred', status: 'To DM', notes: '' },
+      { name: 'Moroccanoil', status: 'To DM', notes: '' },
+      { name: 'Osea Malibu', status: 'To DM', notes: '' },
+      { name: 'Tatcha', status: 'To DM', notes: '' },
+      { name: 'Maison Margiela Fragrances', status: 'To DM', notes: '' },
+      { name: 'Lancôme', status: 'To DM', notes: '' },
+      { name: 'Bano Global', status: 'To DM', notes: '' },
+      { name: 'Cremerie Beauty', status: 'To DM', notes: '' },
+      { name: 'Glow Recipe', status: 'To DM', notes: '' },
+      { name: 'Monday Haircare', status: 'To DM', notes: '' },
+      { name: 'Glossies World', status: 'To DM', notes: '' },
+      { name: 'Entropy Makeup', status: 'To DM', notes: '' },
+      { name: 'Yonka USA', status: 'To DM', notes: '' }
+    ],
     tiers: [
       { name: 'Tier 1', items: [{ label: '', amount: 0 }] },
       { name: 'Tier 2', items: [{ label: '', amount: 0 }] },
@@ -256,6 +272,45 @@ document.getElementById('add-brand').addEventListener('click', () => {
 });
 
 /* ===========================================================
+   BRANDS TO PITCH / DM
+   =========================================================== */
+const PITCH_STATUSES = ['To DM', 'DMed', 'Replied', 'Booked'];
+
+function renderPitch() {
+  const body = document.getElementById('pitch-body');
+  body.innerHTML = '';
+  state.pitchlist.forEach((p, i) => {
+    const tr = document.createElement('tr');
+    tr.dataset.status = p.status;
+    const options = PITCH_STATUSES.map(s =>
+      `<option value="${s}" ${s === p.status ? 'selected' : ''}>${s}</option>`).join('');
+    tr.innerHTML = `
+      <td><input type="text" data-f="name" placeholder="Brand name" /></td>
+      <td><select data-f="status">${options}</select></td>
+      <td><input type="text" data-f="notes" placeholder="Handle, contact, rate…" /></td>
+      <td><button class="row-del" aria-label="Delete">✕</button></td>`;
+    tr.querySelector('[data-f="name"]').value = p.name;
+    tr.querySelector('[data-f="notes"]').value = p.notes;
+    tr.querySelector('[data-f="name"]').addEventListener('input', e => { p.name = e.target.value; save(); });
+    tr.querySelector('[data-f="notes"]').addEventListener('input', e => { p.notes = e.target.value; save(); });
+    tr.querySelector('[data-f="status"]').addEventListener('change', e => {
+      p.status = e.target.value; save(); renderPitch();
+    });
+    tr.querySelector('.row-del').addEventListener('click', () => {
+      state.pitchlist.splice(i, 1); save(); renderPitch();
+    });
+    body.appendChild(tr);
+  });
+  const todo = state.pitchlist.filter(p => p.status === 'To DM').length;
+  document.getElementById('pitch-count').textContent = todo + ' to DM';
+}
+
+document.getElementById('add-pitch').addEventListener('click', () => {
+  state.pitchlist.push({ name: '', status: 'To DM', notes: '' });
+  save(); renderPitch();
+});
+
+/* ===========================================================
    INCOME TIERS — accumulating
    Tier 1 total = sum(tier1 items)
    Tier 2 total = tier1 total + sum(tier2 items)
@@ -343,6 +398,7 @@ function renderAll() {
   ['daily', 'weekly', 'monthly'].forEach(renderTodos);
   renderHeatmap();
   renderBrands();
+  renderPitch();
   renderTiers();
   renderHeader();
 }
