@@ -3,150 +3,219 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>✿ My Content Hub ✿</title>
+  <title>My Content Hub</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Fredoka:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="app">
-    <!-- ===== Header ===== -->
-    <header class="hero">
-      <div class="hero-text">
-        <h1>✿ My Content Hub</h1>
-        <p id="greeting">Hello, lovely ♡</p>
+
+    <!-- ===================== HEADER ===================== -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="lock">🔒</span>
+        <span class="brand-name" id="project-name" contenteditable="true" spellcheck="false">MY CONTENT HUB</span>
+        <span class="brand-badge" id="project-badge" contenteditable="true" spellcheck="false">35</span>
       </div>
-      <div class="hero-date">
-        <span id="today-date"></span>
-        <span id="today-clock" class="clock"></span>
+      <div class="milestones" id="milestones"></div>
+      <div class="topbar-right">
+        <button class="icon-btn" id="bell" title="Daily reset is automatic at midnight">🔔</button>
+        <button class="countdown" id="countdown" title="Click to set the target date">
+          <span>D <b id="cd-d">0</b></span>
+          <span>HR <b id="cd-h">0</b></span>
+          <span>MIN <b id="cd-m">0</b></span>
+        </button>
       </div>
     </header>
 
-    <!-- ===== Top row: To-dos ===== -->
-    <section class="grid grid-3">
+    <!-- ===================== TOP ROW ===================== -->
+    <section class="row row-3">
+
       <!-- DAILY -->
-      <div class="card todo-card" data-list="daily">
-        <div class="card-head">
-          <h2>☀️ Today</h2>
-          <span class="pill" id="daily-progress">0%</span>
+      <div class="panel" id="daily-panel">
+        <div class="panel-head">
+          <div class="head-left">
+            <h2>DAILY</h2>
+          </div>
+          <div class="head-right">
+            <span class="count" id="daily-count">0/0</span>
+            <button class="mini-btn" id="heatmap-btn" title="View completion heatmap">📊</button>
+            <button class="mini-btn add" data-add="daily">ADD</button>
+          </div>
         </div>
-        <p class="reset-note">Resets at midnight · logs to your heatmap</p>
-        <ul class="todo-list" id="daily-list"></ul>
-        <form class="add-form" data-list="daily">
-          <input type="text" placeholder="Add a task for today…" maxlength="120" />
-          <button type="submit" aria-label="Add">＋</button>
+        <ul class="checklist" id="daily-list"></ul>
+        <form class="inline-add hidden" data-add-form="daily">
+          <input type="text" placeholder="New daily task…" maxlength="120" />
+          <button type="submit">＋</button>
         </form>
       </div>
 
       <!-- WEEKLY -->
-      <div class="card todo-card" data-list="weekly">
-        <div class="card-head">
-          <h2>📅 This Week</h2>
-          <span class="pill" id="weekly-progress">0%</span>
+      <div class="panel" id="weekly-panel">
+        <div class="panel-head">
+          <div class="head-left"><h2>WEEKLY GOALS</h2></div>
+          <div class="head-right">
+            <span class="count" id="weekly-count">0/0</span>
+            <button class="mini-btn add" data-add="weekly">ADD</button>
+          </div>
         </div>
-        <p class="reset-note">Resets every Monday</p>
-        <ul class="todo-list" id="weekly-list"></ul>
-        <form class="add-form" data-list="weekly">
-          <input type="text" placeholder="Add a task for this week…" maxlength="120" />
-          <button type="submit" aria-label="Add">＋</button>
+        <div class="daterange">
+          <input type="date" id="weekly-start" />
+          <span class="arrow">→</span>
+          <input type="date" id="weekly-end" />
+          <span class="days-left" id="weekly-left"></span>
+        </div>
+        <div class="timebar"><span id="weekly-bar"></span></div>
+        <ul class="checklist" id="weekly-list"></ul>
+        <form class="inline-add hidden" data-add-form="weekly">
+          <input type="text" placeholder="New weekly goal…" maxlength="120" />
+          <button type="submit">＋</button>
         </form>
       </div>
 
-      <!-- MONTHLY -->
-      <div class="card todo-card" data-list="monthly">
-        <div class="card-head">
-          <h2>🗓️ This Month</h2>
-          <span class="pill" id="monthly-progress">0%</span>
+      <!-- MONTHLY / EOY -->
+      <div class="panel" id="monthly-panel">
+        <div class="panel-head">
+          <div class="head-left">
+            <div class="seg" id="monthly-seg">
+              <button class="seg-btn active" data-sub="MONTHLY">MONTHLY</button>
+              <button class="seg-btn" data-sub="EOY">EOY</button>
+            </div>
+          </div>
+          <div class="head-right">
+            <span class="count" id="monthly-count">0/0</span>
+            <button class="mini-btn add" data-add="monthly">ADD</button>
+          </div>
         </div>
-        <p class="reset-note">Resets on the 1st</p>
-        <ul class="todo-list" id="monthly-list"></ul>
-        <form class="add-form" data-list="monthly">
-          <input type="text" placeholder="Add a task for this month…" maxlength="120" />
-          <button type="submit" aria-label="Add">＋</button>
+        <div class="daterange">
+          <input type="date" id="monthly-start" />
+          <span class="arrow">→</span>
+          <input type="date" id="monthly-end" />
+          <span class="days-left" id="monthly-left"></span>
+        </div>
+        <div class="timebar yellow"><span id="monthly-bar"></span></div>
+        <ul class="checklist" id="monthly-list"></ul>
+        <form class="inline-add hidden" data-add-form="monthly">
+          <input type="text" placeholder="New goal…" maxlength="120" />
+          <button type="submit">＋</button>
         </form>
       </div>
     </section>
 
-    <!-- ===== Heatmap ===== -->
-    <section class="card heatmap-card">
-      <div class="card-head">
-        <h2>🌸 Completion Heatmap</h2>
-        <span class="pill" id="streak-pill">0 day streak</span>
+    <!-- ===================== CATEGORY BAR ===================== -->
+    <section class="catbar">
+      <div class="cat-tabs" id="cat-tabs"></div>
+      <div class="socials" id="socials"></div>
+    </section>
+
+    <h3 class="scope-title"><span id="scope-name">PERSONAL BRAND</span> <small>TASKS SCOPED TO THIS CATEGORY</small></h3>
+
+    <!-- ===================== TIME BUCKETS ===================== -->
+    <section class="row row-3">
+      <div class="panel bucket" data-bucket="24h">
+        <div class="panel-head">
+          <div class="head-left"><h2>24 HOURS</h2><span class="count" data-count="24h">0</span><small class="sub">FINISH TODAY</small></div>
+          <button class="mini-btn add" data-add-bucket="24h">ADD</button>
+        </div>
+        <ul class="checklist tasks" data-list="24h"></ul>
+        <form class="inline-add hidden" data-bucket-form="24h">
+          <input type="text" placeholder="New task…" maxlength="120" />
+          <button type="submit">＋</button>
+        </form>
+        <p class="empty" data-empty="24h">Nothing here yet</p>
       </div>
-      <p class="reset-note">How much of each day's "Today" list you finished</p>
-      <div class="heatmap-wrap">
-        <div class="heatmap" id="heatmap"></div>
+
+      <div class="panel bucket" data-bucket="48h">
+        <div class="panel-head">
+          <div class="head-left"><h2>48 HOURS</h2><span class="count" data-count="48h">0</span><small class="sub">FINISH SOON</small></div>
+          <button class="mini-btn add" data-add-bucket="48h">ADD</button>
+        </div>
+        <ul class="checklist tasks" data-list="48h"></ul>
+        <form class="inline-add hidden" data-bucket-form="48h">
+          <input type="text" placeholder="New task…" maxlength="120" />
+          <button type="submit">＋</button>
+        </form>
+        <p class="empty" data-empty="48h">Nothing here yet</p>
       </div>
+
+      <div class="panel bucket" data-bucket="5d">
+        <div class="panel-head">
+          <div class="head-left"><h2>5 DAYS</h2><span class="count" data-count="5d">0</span><small class="sub">DON'T LET IT ROT</small></div>
+          <button class="mini-btn add" data-add-bucket="5d">ADD</button>
+        </div>
+        <ul class="checklist tasks" data-list="5d"></ul>
+        <form class="inline-add hidden" data-bucket-form="5d">
+          <input type="text" placeholder="New task…" maxlength="120" />
+          <button type="submit">＋</button>
+        </form>
+        <p class="empty" data-empty="5d">Nothing here yet</p>
+      </div>
+    </section>
+
+    <!-- ===================== HEATMAP ===================== -->
+    <section class="panel" id="heatmap-section">
+      <div class="panel-head">
+        <div class="head-left"><h2>COMPLETION HEATMAP</h2></div>
+        <span class="count" id="streak">0 DAY STREAK</span>
+      </div>
+      <p class="muted">How much of each day's DAILY list you finished</p>
+      <div class="heatmap-wrap"><div class="heatmap" id="heatmap"></div></div>
       <div class="heatmap-legend">
-        <span>Less</span>
+        <span>LESS</span>
         <i class="lvl lvl-0"></i><i class="lvl lvl-1"></i><i class="lvl lvl-2"></i><i class="lvl lvl-3"></i><i class="lvl lvl-4"></i>
-        <span>More</span>
+        <span>MORE</span>
       </div>
     </section>
 
-    <!-- ===== Brand tracker ===== -->
-    <section class="card">
-      <div class="card-head">
-        <h2>💼 Brand Tracker</h2>
-        <span class="pill pill-soft" id="brand-total">$0 expected</span>
+    <!-- ===================== BRAND TRACKER ===================== -->
+    <section class="panel">
+      <div class="panel-head">
+        <div class="head-left"><h2>BRAND TRACKER</h2></div>
+        <span class="count" id="brand-total">$0 EXPECTED</span>
       </div>
-      <p class="reset-note">Track posts, rates, and what you can expect to make</p>
+      <p class="muted">Posts, rates, and what you can expect to make</p>
       <div class="table-wrap">
-        <table class="brand-table">
-          <thead>
-            <tr>
-              <th>Brand</th>
-              <th>Posts done</th>
-              <th>Posts owed</th>
-              <th>Rate / post</th>
-              <th>Earned</th>
-              <th>Expected total</th>
-              <th></th>
-            </tr>
-          </thead>
+        <table class="data-table">
+          <thead><tr>
+            <th>Brand</th><th>Posts done</th><th>Posts owed</th><th>Rate / post</th><th>Earned</th><th>Expected</th><th></th>
+          </tr></thead>
           <tbody id="brand-body"></tbody>
         </table>
       </div>
-      <button class="add-row-btn" id="add-brand">＋ Add brand</button>
+      <button class="mini-btn add wide" id="add-brand">＋ ADD BRAND</button>
     </section>
 
-    <!-- ===== Brands to pitch / DM ===== -->
-    <section class="card">
-      <div class="card-head">
-        <h2>💌 Brands to Pitch</h2>
-        <span class="pill pill-soft" id="pitch-count">0 to DM</span>
+    <!-- ===================== PITCH LIST ===================== -->
+    <section class="panel">
+      <div class="panel-head">
+        <div class="head-left"><h2>BRANDS TO PITCH</h2></div>
+        <span class="count" id="pitch-count">0 TO DM</span>
       </div>
-      <p class="reset-note">Your outreach list · update the status as you DM each one</p>
+      <p class="muted">Your outreach list · update status as you DM each one</p>
       <div class="table-wrap">
-        <table class="brand-table pitch-table">
-          <thead>
-            <tr>
-              <th>Brand</th>
-              <th>Status</th>
-              <th>Notes</th>
-              <th></th>
-            </tr>
-          </thead>
+        <table class="data-table">
+          <thead><tr><th>Brand</th><th>Status</th><th>Notes</th><th></th></tr></thead>
           <tbody id="pitch-body"></tbody>
         </table>
       </div>
-      <button class="add-row-btn" id="add-pitch">＋ Add brand to pitch</button>
+      <button class="mini-btn add wide" id="add-pitch">＋ ADD BRAND TO PITCH</button>
     </section>
 
-    <!-- ===== Income targets ===== -->
-    <section class="card">
-      <div class="card-head">
-        <h2>🎯 Income Targets</h2>
-        <span class="pill pill-soft" id="current-income">$0 so far</span>
+    <!-- ===================== INCOME TIERS ===================== -->
+    <section class="panel">
+      <div class="panel-head">
+        <div class="head-left"><h2>INCOME TARGETS</h2></div>
+        <span class="count" id="current-income">$0 SO FAR</span>
       </div>
-      <p class="reset-note">Each tier adds on top of the one before it · totals calculate automatically</p>
-      <div class="grid grid-3 tiers" id="tiers"></div>
+      <p class="muted">Each tier accumulates on top of the last · totals auto-calculate</p>
+      <div class="row row-3 tiers" id="tiers"></div>
     </section>
 
     <footer class="foot">
-      <span>Made with ♡ · your data is saved privately in this browser</span>
-      <button id="reset-all" class="ghost-btn">Reset everything</button>
+      <span>SAVED PRIVATELY IN THIS BROWSER</span>
+      <button id="reset-all" class="mini-btn">RESET EVERYTHING</button>
     </footer>
   </div>
 

@@ -1,21 +1,54 @@
 /* ===========================================================
-   My Content Hub — personal dashboard
-   All data is stored locally in the browser (localStorage).
+   My Content Hub — personal dashboard (brutalist pink)
+   All data stored locally in the browser (localStorage).
    =========================================================== */
 
-const STORE_KEY = 'contentHub.v1';
+const STORE_KEY = 'contentHub.v2';
+const OLD_KEY = 'contentHub.v1';
 
-/* ---------- default / initial state ---------- */
+function todayISO() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function addDaysISO(iso, n) {
+  const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function endOfMonthISO() {
+  const d = new Date(); const e = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  return e.getFullYear() + '-' + String(e.getMonth() + 1).padStart(2, '0') + '-' + String(e.getDate()).padStart(2, '0');
+}
+function startOfMonthISO() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
+}
+
 function defaultState() {
+  const t = todayISO();
   return {
-    todos: { daily: [], weekly: [], monthly: [] },
-    // markers for the last time each list was reset
-    periods: { daily: '', weekly: '', monthly: '' },
-    heatmap: {}, // { 'YYYY-MM-DD': 0..1 completion ratio }
-    brands: [
-      { name: '', done: 0, owed: 0, rate: 0 }
+    project: { name: 'MY CONTENT HUB', badge: '01' },
+    milestones: [
+      { label: 'EOY', date: new Date().getFullYear() + '-12-31' },
+      { label: 'NEXT MONTH', date: addDaysISO(endOfMonthISO(), 1) }
     ],
-    // outreach list — pre-filled with UGC brands from saved reels
+    timerTarget: addDaysISO(endOfMonthISO(), 1),
+    daily: [],
+    weekly: { items: [], start: t, end: addDaysISO(t, 6) },
+    monthly: { active: 'MONTHLY',
+      MONTHLY: { items: [], start: startOfMonthISO(), end: endOfMonthISO() },
+      EOY: { items: [], start: startOfMonthISO(), end: new Date().getFullYear() + '-12-31' } },
+    periods: { daily: '', weekly: '', monthly: '' },
+    heatmap: {},
+    categories: ['Personal Brand', 'Unlocked', 'Payments/Sponsors'],
+    activeCategory: 'ALL',
+    scoped: [],      // { id, text, cat, bucket, done, priority }
+    socials: [
+      { ic: '🎵', label: 'TikTok', num: '0' },
+      { ic: '📸', label: 'Instagram', num: '0' },
+      { ic: '▶️', label: 'YouTube', num: '0' },
+      { ic: '✖️', label: 'X', num: '0' }
+    ],
+    brands: [{ name: '', done: 0, owed: 0, rate: 0 }],
     pitchlist: [
       { name: 'Cecred', status: 'To DM', notes: '' },
       { name: 'Moroccanoil', status: 'To DM', notes: '' },
@@ -39,374 +72,478 @@ function defaultState() {
   };
 }
 
-let state = load();
-
 function load() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    if (!raw) return defaultState();
-    return Object.assign(defaultState(), JSON.parse(raw));
-  } catch (e) {
+    if (raw) return Object.assign(defaultState(), JSON.parse(raw));
+    // migrate from v1 if it exists
+    const old = localStorage.getItem(OLD_KEY);
+    if (old) {
+      const o = JSON.parse(old);
+      const s = defaultState();
+      if (o.brands) s.brands = o.brands;
+      if (o.pitchlist) s.pitchlist = o.pitchlist;
+      if (o.tiers) s.tiers = o.tiers;
+      if (o.heatmap) s.heatmap = o.heatmap;
+      if (o.todos && o.todos.daily) s.daily = o.todos.daily;
+      if (o.todos && o.todos.weekly) s.weekly.items = o.todos.weekly;
+      if (o.todos && o.todos.monthly) s.monthly.MONTHLY.items = o.todos.monthly;
+      return s;
+    }
     return defaultState();
-  }
+  } catch (e) { return defaultState(); }
 }
+let state = load();
 function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
 
-/* ---------- date helpers ---------- */
-function ymd(d = new Date()) {
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
-// Monday-based week key, e.g. "2026-W25"
+const $ = sel => document.querySelector(sel);
+const money = n => '$' + (Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+/* ===========================================================
+   PERIOD RESETS
+   =========================================================== */
 function weekKey(d = new Date()) {
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const day = (date.getUTCDay() + 6) % 7; // Mon=0
+  const day = (date.getUTCDay() + 6) % 7;
   date.setUTCDate(date.getUTCDate() - day + 3);
   const firstThu = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
   const week = 1 + Math.round(((date - firstThu) / 86400000 - 3 + ((firstThu.getUTCDay() + 6) % 7)) / 7);
   return date.getUTCFullYear() + '-W' + String(week).padStart(2, '0');
 }
-function monthKey(d = new Date()) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+function monthKeyOf(d = new Date()) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
 
-/* ===========================================================
-   RESET LOGIC — runs on load and on an interval.
-   - Before a daily reset, the day's completion ratio is logged
-     into the heatmap, then all daily items are un-checked.
-   - Weekly resets each Monday, monthly resets on the 1st.
-   =========================================================== */
 function runResets() {
-  const today = ymd();
-  const thisWeek = weekKey();
-  const thisMonth = monthKey();
-
-  // DAILY
+  const today = todayISO();
   if (state.periods.daily && state.periods.daily !== today) {
-    // log completion of the day that just ended
-    const items = state.todos.daily;
-    if (items.length) {
-      const ratio = items.filter(i => i.done).length / items.length;
+    if (state.daily.length) {
+      const ratio = state.daily.filter(i => i.done).length / state.daily.length;
       state.heatmap[state.periods.daily] = ratio;
     }
-    state.todos.daily.forEach(i => (i.done = false)); // un-check, keep tasks
+    state.daily.forEach(i => (i.done = false));
   }
-  if (state.periods.daily !== today) state.periods.daily = today;
+  state.periods.daily = today;
 
-  // WEEKLY
-  if (state.periods.weekly && state.periods.weekly !== thisWeek) {
-    state.todos.weekly.forEach(i => (i.done = false));
-  }
-  if (state.periods.weekly !== thisWeek) state.periods.weekly = thisWeek;
+  const wk = weekKey();
+  if (state.periods.weekly && state.periods.weekly !== wk) state.weekly.items.forEach(i => (i.done = false));
+  state.periods.weekly = wk;
 
-  // MONTHLY
-  if (state.periods.monthly && state.periods.monthly !== thisMonth) {
-    state.todos.monthly.forEach(i => (i.done = false));
-  }
-  if (state.periods.monthly !== thisMonth) state.periods.monthly = thisMonth;
-
+  const mk = monthKeyOf();
+  if (state.periods.monthly && state.periods.monthly !== mk) state.monthly.MONTHLY.items.forEach(i => (i.done = false));
+  state.periods.monthly = mk;
   save();
 }
 
 /* ===========================================================
-   TO-DO RENDERING
+   HEADER: project, milestones, countdown
    =========================================================== */
-function renderTodos(list) {
-  const ul = document.getElementById(list + '-list');
-  ul.innerHTML = '';
-  state.todos[list].forEach((item, i) => {
-    const li = document.createElement('li');
-    li.className = 'todo-item' + (item.done ? ' done' : '');
-    li.innerHTML = `
-      <input type="checkbox" class="check" ${item.done ? 'checked' : ''} />
-      <span class="todo-text"></span>
-      <button class="del" aria-label="Delete">✕</button>`;
-    li.querySelector('.todo-text').textContent = item.text;
-    li.querySelector('.check').addEventListener('change', e => {
-      item.done = e.target.checked;
-      save(); renderTodos(list); updateHeatmapLive();
-    });
-    li.querySelector('.del').addEventListener('click', () => {
-      state.todos[list].splice(i, 1); save(); renderTodos(list); updateHeatmapLive();
-    });
-    ul.appendChild(li);
+function bindEditable(el, getter, setter) {
+  el.textContent = getter();
+  el.addEventListener('blur', () => { setter(el.textContent.trim()); save(); });
+  el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } });
+}
+
+function daysUntil(iso) {
+  const target = new Date(iso + 'T00:00:00');
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  return Math.round((target - now) / 86400000);
+}
+
+function renderMilestones() {
+  const wrap = $('#milestones');
+  wrap.innerHTML = '';
+  state.milestones.forEach((m, i) => {
+    const d = daysUntil(m.date);
+    const el = document.createElement('div');
+    el.className = 'milestone';
+    el.innerHTML = `<b>${d}</b><span class="lbl">d → ${m.label}</span><span class="x" title="Remove">✕</span>`;
+    el.querySelector('.x').addEventListener('click', () => { state.milestones.splice(i, 1); save(); renderMilestones(); });
+    wrap.appendChild(el);
   });
-  updateProgress(list);
+  const add = document.createElement('div');
+  add.className = 'milestone'; add.style.cursor = 'pointer';
+  add.innerHTML = `<b>＋</b>`;
+  add.addEventListener('click', () => {
+    const label = prompt('Milestone name (e.g. LAUNCH):'); if (!label) return;
+    const date = prompt('Date (YYYY-MM-DD):', todayISO()); if (!date) return;
+    state.milestones.push({ label: label.toUpperCase(), date }); save(); renderMilestones();
+  });
+  wrap.appendChild(add);
 }
 
-function updateProgress(list) {
-  const items = state.todos[list];
-  const pct = items.length ? Math.round(items.filter(i => i.done).length / items.length * 100) : 0;
-  document.getElementById(list + '-progress').textContent = pct + '%';
+function tickCountdown() {
+  const target = new Date(state.timerTarget + 'T00:00:00');
+  let diff = Math.max(0, target - new Date());
+  const d = Math.floor(diff / 86400000); diff -= d * 86400000;
+  const h = Math.floor(diff / 3600000); diff -= h * 3600000;
+  const m = Math.floor(diff / 60000);
+  $('#cd-d').textContent = d; $('#cd-h').textContent = h; $('#cd-m').textContent = m;
 }
 
-document.querySelectorAll('.add-form').forEach(form => {
+/* ===========================================================
+   CHECKLISTS (daily / weekly / monthly)
+   =========================================================== */
+function makeCheckItem(item, onToggle, onDelete) {
+  const li = document.createElement('li');
+  li.className = 'check-item' + (item.done ? ' done' : '');
+  li.innerHTML = `<input type="checkbox" class="cb" ${item.done ? 'checked' : ''}/><span class="txt"></span><button class="rm">✕</button>`;
+  li.querySelector('.txt').textContent = item.text;
+  li.querySelector('.cb').addEventListener('change', e => { item.done = e.target.checked; onToggle(); });
+  li.querySelector('.rm').addEventListener('click', onDelete);
+  return li;
+}
+
+function renderDaily() {
+  const ul = $('#daily-list'); ul.innerHTML = '';
+  state.daily.forEach((item, i) => {
+    ul.appendChild(makeCheckItem(item,
+      () => { save(); renderDaily(); updateHeatmapLive(); },
+      () => { state.daily.splice(i, 1); save(); renderDaily(); updateHeatmapLive(); }));
+  });
+  $('#daily-count').textContent = state.daily.filter(i => i.done).length + '/' + state.daily.length;
+}
+
+function renderPeriodList(which) {
+  const data = which === 'weekly' ? state.weekly : currentMonthly();
+  const ul = $('#' + which + '-list'); ul.innerHTML = '';
+  data.items.forEach((item, i) => {
+    ul.appendChild(makeCheckItem(item,
+      () => { save(); renderPeriodList(which); },
+      () => { data.items.splice(i, 1); save(); renderPeriodList(which); }));
+  });
+  $('#' + which + '-count').textContent = data.items.filter(i => i.done).length + '/' + data.items.length;
+  renderTimebar(which, data);
+}
+function currentMonthly() { return state.monthly[state.monthly.active]; }
+
+function renderTimebar(which, data) {
+  const bar = $('#' + which + '-bar');
+  const left = $('#' + which + '-left');
+  const start = new Date(data.start + 'T00:00:00');
+  const end = new Date(data.end + 'T00:00:00');
+  const now = new Date();
+  let pct = 0;
+  if (end > start) pct = Math.min(100, Math.max(0, (now - start) / (end - start) * 100));
+  bar.style.width = pct + '%';
+  const d = daysUntil(data.end);
+  left.textContent = d < 0 ? 'OVERDUE' : d + 'D LEFT';
+  left.className = 'days-left ' + (d < 0 ? 'late' : d <= 3 ? 'late' : d <= 10 ? 'warn' : 'ok');
+}
+
+/* date inputs */
+function bindDates(which) {
+  const data = which === 'weekly' ? state.weekly : currentMonthly();
+  const s = $('#' + which + '-start'), e = $('#' + which + '-end');
+  s.value = data.start; e.value = data.end;
+  s.onchange = () => { (which === 'weekly' ? state.weekly : currentMonthly()).start = s.value; save(); renderPeriodList(which); };
+  e.onchange = () => { (which === 'weekly' ? state.weekly : currentMonthly()).end = e.value; save(); renderPeriodList(which); };
+}
+
+/* add forms (daily/weekly/monthly) */
+document.querySelectorAll('[data-add]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const form = document.querySelector(`[data-add-form="${btn.dataset.add}"]`);
+    form.classList.toggle('hidden');
+    if (!form.classList.contains('hidden')) form.querySelector('input').focus();
+  });
+});
+document.querySelectorAll('[data-add-form]').forEach(form => {
   form.addEventListener('submit', e => {
     e.preventDefault();
-    const list = form.dataset.list;
+    const which = form.dataset.addForm;
     const input = form.querySelector('input');
-    const text = input.value.trim();
-    if (!text) return;
-    state.todos[list].push({ text, done: false });
-    input.value = '';
-    save(); renderTodos(list); updateHeatmapLive();
+    const text = input.value.trim(); if (!text) return;
+    if (which === 'daily') { state.daily.push({ text, done: false }); renderDaily(); updateHeatmapLive(); }
+    else if (which === 'weekly') { state.weekly.items.push({ text, done: false }); renderPeriodList('weekly'); }
+    else { currentMonthly().items.push({ text, done: false }); renderPeriodList('monthly'); }
+    input.value = ''; save();
+  });
+});
+
+/* MONTHLY/EOY toggle */
+document.querySelectorAll('#monthly-seg .seg-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('#monthly-seg .seg-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    state.monthly.active = b.dataset.sub; save();
+    bindDates('monthly'); renderPeriodList('monthly');
   });
 });
 
 /* ===========================================================
-   HEATMAP — last ~26 weeks of daily completion
+   CATEGORY TABS + SCOPED TASK BUCKETS
+   =========================================================== */
+function renderCategories() {
+  const wrap = $('#cat-tabs'); wrap.innerHTML = '';
+  const all = ['ALL', ...state.categories];
+  all.forEach(cat => {
+    const tab = document.createElement('button');
+    tab.className = 'cat-tab' + (state.activeCategory === cat ? ' active' : '');
+    tab.innerHTML = `<span>${cat.toUpperCase()}</span>`;
+    tab.addEventListener('click', () => { state.activeCategory = cat; save(); renderCategories(); renderBuckets(); });
+    if (cat !== 'ALL' && state.activeCategory === cat) {
+      const x = document.createElement('span'); x.className = 'x'; x.textContent = '✕';
+      x.title = 'Delete category';
+      x.addEventListener('click', ev => {
+        ev.stopPropagation();
+        if (!confirm(`Delete category "${cat}" and its tasks?`)) return;
+        state.scoped = state.scoped.filter(t => t.cat !== cat);
+        state.categories = state.categories.filter(c => c !== cat);
+        state.activeCategory = 'ALL'; save(); renderCategories(); renderBuckets();
+      });
+      tab.appendChild(x);
+    }
+    wrap.appendChild(tab);
+  });
+  const add = document.createElement('button');
+  add.className = 'cat-tab'; add.innerHTML = '<span>＋</span>';
+  add.addEventListener('click', () => {
+    const name = prompt('New category name:'); if (!name) return;
+    state.categories.push(name); state.activeCategory = name; save(); renderCategories(); renderBuckets();
+  });
+  wrap.appendChild(add);
+  $('#scope-name').textContent = state.activeCategory.toUpperCase();
+}
+
+const PRIOS = ['p-green', 'p-yellow', 'p-red'];
+function renderBuckets() {
+  ['24h', '48h', '5d'].forEach(bucket => {
+    const ul = document.querySelector(`[data-list="${bucket}"]`);
+    ul.innerHTML = '';
+    const items = state.scoped.filter(t => t.bucket === bucket &&
+      (state.activeCategory === 'ALL' || t.cat === state.activeCategory));
+    items.forEach(item => {
+      const li = document.createElement('li');
+      li.className = 'check-item' + (item.done ? ' done' : '');
+      const prio = item.priority || 'p-green';
+      const catTag = state.activeCategory === 'ALL' ? ` · ${item.cat}` : '';
+      li.innerHTML = `<input type="checkbox" class="cb" ${item.done ? 'checked' : ''}/>
+        <span class="txt"></span>
+        <span class="dot ${prio}" title="Priority — click to change"></span>
+        <button class="rm">✕</button>`;
+      li.querySelector('.txt').textContent = item.text + catTag;
+      li.querySelector('.cb').addEventListener('change', e => { item.done = e.target.checked; save(); renderBuckets(); });
+      li.querySelector('.dot').addEventListener('click', () => {
+        const idx = (PRIOS.indexOf(prio) + 1) % PRIOS.length; item.priority = PRIOS[idx]; save(); renderBuckets();
+      });
+      li.querySelector('.rm').addEventListener('click', () => {
+        state.scoped = state.scoped.filter(t => t !== item); save(); renderBuckets();
+      });
+      ul.appendChild(li);
+    });
+    document.querySelector(`[data-count="${bucket}"]`).textContent = items.filter(i => !i.done).length;
+    const empty = document.querySelector(`[data-empty="${bucket}"]`);
+    empty.style.display = items.length ? 'none' : 'block';
+  });
+}
+
+document.querySelectorAll('[data-add-bucket]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const form = document.querySelector(`[data-bucket-form="${btn.dataset.addBucket}"]`);
+    form.classList.toggle('hidden');
+    if (!form.classList.contains('hidden')) form.querySelector('input').focus();
+  });
+});
+document.querySelectorAll('[data-bucket-form]').forEach(form => {
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const bucket = form.dataset.bucketForm;
+    const input = form.querySelector('input');
+    const text = input.value.trim(); if (!text) return;
+    const cat = state.activeCategory === 'ALL' ? (state.categories[0] || 'General') : state.activeCategory;
+    state.scoped.push({ id: uid(), text, cat, bucket, done: false, priority: 'p-green' });
+    input.value = ''; save(); renderBuckets();
+  });
+});
+
+/* ===========================================================
+   SOCIAL BADGES
+   =========================================================== */
+function renderSocials() {
+  const wrap = $('#socials'); wrap.innerHTML = '';
+  state.socials.forEach((s, i) => {
+    const el = document.createElement('div');
+    el.className = 'social';
+    el.innerHTML = `<span class="ic">${s.ic}</span><span class="num" contenteditable="true" spellcheck="false"></span>`;
+    const num = el.querySelector('.num');
+    num.textContent = s.num;
+    num.addEventListener('blur', () => { state.socials[i].num = num.textContent.trim(); save(); });
+    num.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); num.blur(); } });
+    wrap.appendChild(el);
+  });
+}
+
+/* ===========================================================
+   HEATMAP
    =========================================================== */
 function updateHeatmapLive() {
-  // reflect today's in-progress completion immediately
-  const items = state.todos.daily;
-  if (items.length) state.heatmap[ymd()] = items.filter(i => i.done).length / items.length;
-  else delete state.heatmap[ymd()];
-  save();
-  renderHeatmap();
+  if (state.daily.length) state.heatmap[todayISO()] = state.daily.filter(i => i.done).length / state.daily.length;
+  else delete state.heatmap[todayISO()];
+  save(); renderHeatmap();
 }
-
-function level(ratio) {
-  if (ratio == null) return 0;
-  if (ratio <= 0) return 0;
-  if (ratio < 0.25) return 1;
-  if (ratio < 0.5) return 2;
-  if (ratio < 0.85) return 3;
-  return 4;
-}
-
+function level(r) { if (r == null || r <= 0) return 0; if (r < 0.25) return 1; if (r < 0.5) return 2; if (r < 0.85) return 3; return 4; }
 function renderHeatmap() {
-  const wrap = document.getElementById('heatmap');
-  wrap.innerHTML = '';
+  const wrap = $('#heatmap'); wrap.innerHTML = '';
   const WEEKS = 26;
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  // start on the Monday WEEKS-1 weeks ago
   const start = new Date(today);
-  const dow = (start.getDay() + 6) % 7;
-  start.setDate(start.getDate() - dow - (WEEKS - 1) * 7);
-
-  for (let w = 0; w < WEEKS; w++) {
-    for (let d = 0; d < 7; d++) {
-      const cur = new Date(start);
-      cur.setDate(start.getDate() + w * 7 + d);
-      const cell = document.createElement('div');
-      const key = ymd(cur);
-      if (cur > today) {
-        cell.className = 'cell future';
-      } else {
-        const ratio = state.heatmap[key];
-        cell.className = 'cell lvl-' + level(ratio);
-        const pct = ratio != null ? Math.round(ratio * 100) + '% done' : 'no data';
-        cell.title = key + ' · ' + pct;
-      }
-      wrap.appendChild(cell);
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7) - (WEEKS - 1) * 7);
+  for (let w = 0; w < WEEKS; w++) for (let d = 0; d < 7; d++) {
+    const cur = new Date(start); cur.setDate(start.getDate() + w * 7 + d);
+    const cell = document.createElement('div');
+    const key = cur.getFullYear() + '-' + String(cur.getMonth() + 1).padStart(2, '0') + '-' + String(cur.getDate()).padStart(2, '0');
+    if (cur > today) cell.className = 'cell future';
+    else {
+      const r = state.heatmap[key];
+      cell.className = 'cell lvl-' + level(r);
+      cell.title = key + ' · ' + (r != null ? Math.round(r * 100) + '% done' : 'no data');
     }
+    wrap.appendChild(cell);
   }
-  renderStreak();
-}
-
-function renderStreak() {
-  let streak = 0;
-  const cur = new Date(); cur.setHours(0, 0, 0, 0);
-  // count back while a day has >0 completion
+  let streak = 0; const cur = new Date(); cur.setHours(0, 0, 0, 0);
   for (;;) {
-    const r = state.heatmap[ymd(cur)];
-    if (r != null && r > 0) { streak++; cur.setDate(cur.getDate() - 1); }
-    else break;
+    const k = cur.getFullYear() + '-' + String(cur.getMonth() + 1).padStart(2, '0') + '-' + String(cur.getDate()).padStart(2, '0');
+    if (state.heatmap[k] > 0) { streak++; cur.setDate(cur.getDate() - 1); } else break;
   }
-  document.getElementById('streak-pill').textContent = streak + (streak === 1 ? ' day streak' : ' day streak');
+  $('#streak').textContent = streak + ' DAY STREAK';
 }
+$('#heatmap-btn').addEventListener('click', () => $('#heatmap-section').scrollIntoView({ behavior: 'smooth', block: 'center' }));
 
 /* ===========================================================
    BRAND TRACKER
    =========================================================== */
-const money = n => '$' + (Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
-
+function brandExpected() { return state.brands.reduce((s, b) => s + ((+b.done || 0) + (+b.owed || 0)) * (+b.rate || 0), 0); }
+function brandEarned() { return state.brands.reduce((s, b) => s + (+b.done || 0) * (+b.rate || 0), 0); }
 function renderBrands() {
-  const body = document.getElementById('brand-body');
-  body.innerHTML = '';
-  let totalExpected = 0;
+  const body = $('#brand-body'); body.innerHTML = '';
   state.brands.forEach((b, i) => {
-    const earned = (Number(b.done) || 0) * (Number(b.rate) || 0);
-    const expected = ((Number(b.done) || 0) + (Number(b.owed) || 0)) * (Number(b.rate) || 0);
-    totalExpected += expected;
+    const earned = (+b.done || 0) * (+b.rate || 0);
+    const expected = ((+b.done || 0) + (+b.owed || 0)) * (+b.rate || 0);
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><input type="text" data-f="name" placeholder="Brand name" /></td>
-      <td><input type="number" data-f="done" min="0" /></td>
-      <td><input type="number" data-f="owed" min="0" /></td>
-      <td><input type="number" data-f="rate" min="0" step="0.01" /></td>
-      <td class="cell-calc">${money(earned)}</td>
-      <td class="cell-calc">${money(expected)}</td>
-      <td><button class="row-del" aria-label="Delete">✕</button></td>`;
+      <td><input type="text" data-f="name" placeholder="Brand"/></td>
+      <td><input type="number" data-f="done" min="0"/></td>
+      <td><input type="number" data-f="owed" min="0"/></td>
+      <td><input type="number" data-f="rate" min="0" step="0.01"/></td>
+      <td class="calc">${money(earned)}</td>
+      <td class="calc">${money(expected)}</td>
+      <td><button class="row-del">✕</button></td>`;
     tr.querySelector('[data-f="name"]').value = b.name;
     tr.querySelector('[data-f="done"]').value = b.done;
     tr.querySelector('[data-f="owed"]').value = b.owed;
     tr.querySelector('[data-f="rate"]').value = b.rate;
-    tr.querySelectorAll('input').forEach(inp => {
-      inp.addEventListener('input', () => {
-        const f = inp.dataset.f;
-        b[f] = f === 'name' ? inp.value : (parseFloat(inp.value) || 0);
-        save(); renderBrandTotals();
-      });
-    });
-    tr.querySelector('.row-del').addEventListener('click', () => {
-      state.brands.splice(i, 1); save(); renderBrands(); renderTiers();
-    });
+    tr.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => {
+      const f = inp.dataset.f; b[f] = f === 'name' ? inp.value : (parseFloat(inp.value) || 0);
+      save(); renderBrandTotals();
+    }));
+    tr.querySelector('.row-del').addEventListener('click', () => { state.brands.splice(i, 1); save(); renderBrands(); });
     body.appendChild(tr);
   });
   renderBrandTotals();
 }
-
-function brandExpectedTotal() {
-  return state.brands.reduce((s, b) =>
-    s + ((Number(b.done) || 0) + (Number(b.owed) || 0)) * (Number(b.rate) || 0), 0);
-}
-function brandEarnedTotal() {
-  return state.brands.reduce((s, b) => s + (Number(b.done) || 0) * (Number(b.rate) || 0), 0);
-}
 function renderBrandTotals() {
-  document.getElementById('brand-total').textContent = money(brandExpectedTotal()) + ' expected';
-  renderTiers(); // tiers show progress against current earnings
+  $('#brand-total').textContent = money(brandExpected()) + ' EXPECTED';
+  renderTiers();
 }
-
-document.getElementById('add-brand').addEventListener('click', () => {
-  state.brands.push({ name: '', done: 0, owed: 0, rate: 0 });
-  save(); renderBrands();
-});
+$('#add-brand').addEventListener('click', () => { state.brands.push({ name: '', done: 0, owed: 0, rate: 0 }); save(); renderBrands(); });
 
 /* ===========================================================
-   BRANDS TO PITCH / DM
+   PITCH LIST
    =========================================================== */
 const PITCH_STATUSES = ['To DM', 'DMed', 'Replied', 'Booked'];
-
 function renderPitch() {
-  const body = document.getElementById('pitch-body');
-  body.innerHTML = '';
+  const body = $('#pitch-body'); body.innerHTML = '';
   state.pitchlist.forEach((p, i) => {
     const tr = document.createElement('tr');
-    tr.dataset.status = p.status;
-    const options = PITCH_STATUSES.map(s =>
-      `<option value="${s}" ${s === p.status ? 'selected' : ''}>${s}</option>`).join('');
+    const opts = PITCH_STATUSES.map(s => `<option ${s === p.status ? 'selected' : ''}>${s}</option>`).join('');
     tr.innerHTML = `
-      <td><input type="text" data-f="name" placeholder="Brand name" /></td>
-      <td><select data-f="status">${options}</select></td>
-      <td><input type="text" data-f="notes" placeholder="Handle, contact, rate…" /></td>
-      <td><button class="row-del" aria-label="Delete">✕</button></td>`;
+      <td><input type="text" data-f="name" placeholder="Brand"/></td>
+      <td><select data-f="status">${opts}</select></td>
+      <td><input type="text" data-f="notes" placeholder="Handle, contact, rate…"/></td>
+      <td><button class="row-del">✕</button></td>`;
     tr.querySelector('[data-f="name"]').value = p.name;
     tr.querySelector('[data-f="notes"]').value = p.notes;
     tr.querySelector('[data-f="name"]').addEventListener('input', e => { p.name = e.target.value; save(); });
     tr.querySelector('[data-f="notes"]').addEventListener('input', e => { p.notes = e.target.value; save(); });
-    tr.querySelector('[data-f="status"]').addEventListener('change', e => {
-      p.status = e.target.value; save(); renderPitch();
-    });
-    tr.querySelector('.row-del').addEventListener('click', () => {
-      state.pitchlist.splice(i, 1); save(); renderPitch();
-    });
+    tr.querySelector('[data-f="status"]').addEventListener('change', e => { p.status = e.target.value; save(); renderPitch(); });
+    tr.querySelector('.row-del').addEventListener('click', () => { state.pitchlist.splice(i, 1); save(); renderPitch(); });
     body.appendChild(tr);
   });
-  const todo = state.pitchlist.filter(p => p.status === 'To DM').length;
-  document.getElementById('pitch-count').textContent = todo + ' to DM';
+  $('#pitch-count').textContent = state.pitchlist.filter(p => p.status === 'To DM').length + ' TO DM';
 }
-
-document.getElementById('add-pitch').addEventListener('click', () => {
-  state.pitchlist.push({ name: '', status: 'To DM', notes: '' });
-  save(); renderPitch();
-});
+$('#add-pitch').addEventListener('click', () => { state.pitchlist.push({ name: '', status: 'To DM', notes: '' }); save(); renderPitch(); });
 
 /* ===========================================================
-   INCOME TIERS — accumulating
-   Tier 1 total = sum(tier1 items)
-   Tier 2 total = tier1 total + sum(tier2 items)
-   Tier 3 total = tier2 total + sum(tier3 items)
+   INCOME TIERS (accumulating)
    =========================================================== */
-function tierSubtotal(t) {
-  return t.items.reduce((s, it) => s + (Number(it.amount) || 0), 0);
-}
-
+function tierSub(t) { return t.items.reduce((s, it) => s + (+it.amount || 0), 0); }
 function renderTiers() {
-  const container = document.getElementById('tiers');
-  container.innerHTML = '';
-  const earned = brandEarnedTotal();
-  document.getElementById('current-income').textContent = money(earned) + ' so far';
-
-  let cumulative = 0;
-  state.tiers.forEach((tier, ti) => {
-    cumulative += tierSubtotal(tier);
-    const cumTotal = cumulative;
-    const pct = cumTotal > 0 ? Math.min(100, Math.round(earned / cumTotal * 100)) : 0;
-
-    const div = document.createElement('div');
-    div.className = 'tier';
+  const wrap = $('#tiers'); wrap.innerHTML = '';
+  const earned = brandEarned();
+  $('#current-income').textContent = money(earned) + ' SO FAR';
+  let cum = 0;
+  state.tiers.forEach(tier => {
+    cum += tierSub(tier);
+    const total = cum;
+    const pct = total > 0 ? Math.min(100, Math.round(earned / total * 100)) : 0;
+    const div = document.createElement('div'); div.className = 'tier';
     div.innerHTML = `
       <h3>${tier.name}</h3>
-      <div class="tier-total">${money(cumTotal)} <small>cumulative goal</small></div>
-      <div class="tier-progress"><span style="width:${pct}%"></span></div>
-      <div class="tier-meta">${pct}% reached · this tier adds ${money(tierSubtotal(tier))}</div>
+      <div class="tier-total">${money(total)}<small>CUMULATIVE GOAL</small></div>
+      <div class="tier-bar"><span style="width:${pct}%"></span></div>
+      <div class="tier-meta">${pct}% reached · adds ${money(tierSub(tier))}</div>
       <div class="tier-items"></div>
       <button class="tier-add">＋ add line</button>`;
-
     const itemsWrap = div.querySelector('.tier-items');
     tier.items.forEach((it, ii) => {
-      const row = document.createElement('div');
-      row.className = 'tier-item';
-      row.innerHTML = `
-        <input type="text" placeholder="Source (e.g. Brand deal)" />
-        <input type="number" min="0" step="0.01" placeholder="0" />
-        <button class="row-del" aria-label="Delete">✕</button>`;
+      const row = document.createElement('div'); row.className = 'tier-item';
+      row.innerHTML = `<input type="text" placeholder="Source"/><input type="number" min="0" step="0.01" placeholder="0"/><button class="row-del">✕</button>`;
       const [txt, amt] = row.querySelectorAll('input');
       txt.value = it.label; amt.value = it.amount;
       txt.addEventListener('input', () => { it.label = txt.value; save(); });
       amt.addEventListener('input', () => { it.amount = parseFloat(amt.value) || 0; save(); renderTiers(); });
-      row.querySelector('.row-del').addEventListener('click', () => {
-        tier.items.splice(ii, 1); save(); renderTiers();
-      });
+      row.querySelector('.row-del').addEventListener('click', () => { tier.items.splice(ii, 1); save(); renderTiers(); });
       itemsWrap.appendChild(row);
     });
-
-    div.querySelector('.tier-add').addEventListener('click', () => {
-      tier.items.push({ label: '', amount: 0 }); save(); renderTiers();
-    });
-    container.appendChild(div);
+    div.querySelector('.tier-add').addEventListener('click', () => { tier.items.push({ label: '', amount: 0 }); save(); renderTiers(); });
+    wrap.appendChild(div);
   });
 }
 
 /* ===========================================================
-   HEADER clock + greeting
+   COUNTDOWN target editor + reset all
    =========================================================== */
-function renderHeader() {
-  const now = new Date();
-  const h = now.getHours();
-  const greet = h < 12 ? 'Good morning, lovely ♡' : h < 18 ? 'Good afternoon, lovely ♡' : 'Good evening, lovely ♡';
-  document.getElementById('greeting').textContent = greet;
-  document.getElementById('today-date').textContent =
-    now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-  document.getElementById('today-clock').textContent =
-    now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-}
-
-/* ===========================================================
-   RESET EVERYTHING
-   =========================================================== */
-document.getElementById('reset-all').addEventListener('click', () => {
-  if (confirm('This will erase all tasks, brands, heatmap history and targets. Are you sure?')) {
-    state = defaultState();
-    save(); renderAll();
-  }
+$('#countdown').addEventListener('click', () => {
+  const v = prompt('Countdown target date (YYYY-MM-DD):', state.timerTarget);
+  if (v) { state.timerTarget = v; save(); tickCountdown(); }
+});
+$('#reset-all').addEventListener('click', () => {
+  if (confirm('Erase EVERYTHING and start fresh?')) { localStorage.removeItem(STORE_KEY); localStorage.removeItem(OLD_KEY); state = defaultState(); save(); renderAll(); }
 });
 
 /* ===========================================================
    BOOT
    =========================================================== */
 function renderAll() {
-  ['daily', 'weekly', 'monthly'].forEach(renderTodos);
+  bindEditable($('#project-name'), () => state.project.name, v => state.project.name = v);
+  bindEditable($('#project-badge'), () => state.project.badge, v => state.project.badge = v);
+  renderMilestones();
+  tickCountdown();
+  renderDaily();
+  bindDates('weekly'); renderPeriodList('weekly');
+  document.querySelectorAll('#monthly-seg .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.sub === state.monthly.active));
+  bindDates('monthly'); renderPeriodList('monthly');
+  renderCategories(); renderBuckets();
+  renderSocials();
   renderHeatmap();
   renderBrands();
   renderPitch();
   renderTiers();
-  renderHeader();
 }
 
 runResets();
 renderAll();
 updateHeatmapLive();
 
-// keep clock fresh + catch the midnight rollover while the tab is open
-setInterval(renderHeader, 30 * 1000);
-setInterval(() => { runResets(); renderAll(); }, 60 * 1000);
+setInterval(tickCountdown, 1000);
+setInterval(() => { runResets(); renderDaily(); renderMilestones(); renderPeriodList('weekly'); renderPeriodList('monthly'); }, 60 * 1000);
