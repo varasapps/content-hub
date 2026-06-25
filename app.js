@@ -49,6 +49,7 @@ function defaultState() {
       { ic: '✖️', label: 'X', num: '0' }
     ],
     brands: [{ name: '', done: 0, owed: 0, rate: 0 }],
+    cpm: [{ label: '', cpm: 5, low: 0, high: 0 }],
     pitchlist: [
       { name: 'Cecred', status: 'To DM', notes: '' },
       { name: 'Moroccanoil', status: 'To DM', notes: '' },
@@ -460,6 +461,12 @@ function renderBrands() {
     tr.querySelector('[data-f="rate"]').value = b.rate;
     tr.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => {
       const f = inp.dataset.f; b[f] = f === 'name' ? inp.value : (parseFloat(inp.value) || 0);
+      // recompute THIS row live (without rebuilding the table, so focus stays)
+      const e = (+b.done || 0) * (+b.rate || 0);
+      const x = ((+b.done || 0) + (+b.owed || 0)) * (+b.rate || 0);
+      const calc = tr.querySelectorAll('.calc');
+      calc[0].textContent = money(e);
+      calc[1].textContent = money(x);
       save(); renderBrandTotals();
     }));
     tr.querySelector('.row-del').addEventListener('click', () => { state.brands.splice(i, 1); save(); renderBrands(); });
@@ -469,9 +476,47 @@ function renderBrands() {
 }
 function renderBrandTotals() {
   $('#brand-total').textContent = money(brandExpected()) + ' EXPECTED';
-  renderTiers();
+  updateTierTotals();
 }
 $('#add-brand').addEventListener('click', () => { state.brands.push({ name: '', done: 0, owed: 0, rate: 0 }); save(); renderBrands(); });
+
+/* ===========================================================
+   CPM ESTIMATOR — view-based pay
+   payout = views / 1000 * CPM ; low+high views give a range
+   =========================================================== */
+function cpmPay(views, rate) { return (Number(views) || 0) / 1000 * (Number(rate) || 0); }
+function updateCpmTotal() {
+  let lo = 0, hi = 0;
+  state.cpm.forEach(c => { lo += cpmPay(c.low, c.cpm); hi += cpmPay(c.high, c.cpm); });
+  $('#cpm-total').textContent = money(lo) + ' – ' + money(hi) + ' EST';
+}
+function renderCPM() {
+  const body = $('#cpm-body'); body.innerHTML = '';
+  state.cpm.forEach((c, i) => {
+    const lo = cpmPay(c.low, c.cpm), hi = cpmPay(c.high, c.cpm);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" data-f="label" placeholder="e.g. TikTok post"/></td>
+      <td><input type="number" data-f="cpm" min="0" step="0.01"/></td>
+      <td><input type="number" data-f="low" min="0"/></td>
+      <td><input type="number" data-f="high" min="0"/></td>
+      <td class="calc">${money(lo)} – ${money(hi)}</td>
+      <td><button class="row-del">✕</button></td>`;
+    tr.querySelector('[data-f="label"]').value = c.label;
+    tr.querySelector('[data-f="cpm"]').value = c.cpm;
+    tr.querySelector('[data-f="low"]').value = c.low;
+    tr.querySelector('[data-f="high"]').value = c.high;
+    tr.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => {
+      const f = inp.dataset.f; c[f] = f === 'label' ? inp.value : (parseFloat(inp.value) || 0);
+      tr.querySelector('.calc').textContent = money(cpmPay(c.low, c.cpm)) + ' – ' + money(cpmPay(c.high, c.cpm));
+      save(); updateCpmTotal();
+    }));
+    tr.querySelector('.row-del').addEventListener('click', () => { state.cpm.splice(i, 1); save(); renderCPM(); });
+    body.appendChild(tr);
+  });
+  updateCpmTotal();
+}
+$('#add-cpm').addEventListener('click', () => { state.cpm.push({ label: '', cpm: 5, low: 0, high: 0 }); save(); renderCPM(); });
 
 /* ===========================================================
    PITCH LIST
@@ -503,6 +548,24 @@ $('#add-pitch').addEventListener('click', () => { state.pitchlist.push({ name: '
    INCOME TIERS (accumulating)
    =========================================================== */
 function tierSub(t) { return t.items.reduce((s, it) => s + (+it.amount || 0), 0); }
+
+// update only the displayed totals/bars (keeps inputs alive so you can keep typing)
+function updateTierTotals() {
+  const earned = brandEarned();
+  const ci = $('#current-income'); if (ci) ci.textContent = money(earned) + ' SO FAR';
+  const cards = document.querySelectorAll('#tiers .tier');
+  let cum = 0;
+  state.tiers.forEach((tier, i) => {
+    cum += tierSub(tier);
+    const total = cum;
+    const pct = total > 0 ? Math.min(100, Math.round(earned / total * 100)) : 0;
+    const card = cards[i]; if (!card) return;
+    card.querySelector('.tier-total').innerHTML = `${money(total)}<small>CUMULATIVE GOAL</small>`;
+    card.querySelector('.tier-bar > span').style.width = pct + '%';
+    card.querySelector('.tier-meta').textContent = `${pct}% reached · adds ${money(tierSub(tier))}`;
+  });
+}
+
 function renderTiers() {
   const wrap = $('#tiers'); wrap.innerHTML = '';
   const earned = brandEarned();
@@ -527,7 +590,7 @@ function renderTiers() {
       const [txt, amt] = row.querySelectorAll('input');
       txt.value = it.label; amt.value = it.amount;
       txt.addEventListener('input', () => { it.label = txt.value; save(); });
-      amt.addEventListener('input', () => { it.amount = parseFloat(amt.value) || 0; save(); renderTiers(); });
+      amt.addEventListener('input', () => { it.amount = parseFloat(amt.value) || 0; save(); updateTierTotals(); });
       row.querySelector('.row-del').addEventListener('click', () => { tier.items.splice(ii, 1); save(); renderTiers(); });
       itemsWrap.appendChild(row);
     });
@@ -563,6 +626,7 @@ function renderAll() {
   renderSocials();
   renderHeatmap();
   renderBrands();
+  renderCPM();
   renderPitch();
   renderTiers();
 }
