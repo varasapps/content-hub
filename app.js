@@ -48,7 +48,7 @@ function defaultState() {
       { ic: '▶️', label: 'YouTube', num: '0' },
       { ic: '✖️', label: 'X', num: '0' }
     ],
-    brands: [{ name: '', done: 0, owed: 0, rate: 0 }],
+    brands: [{ name: '', type: 'post', done: 0, owed: 0, rate: 0, views: 0 }],
     cpm: [{ label: '', cpm: 5, low: 0, high: 0 }],
     pitchlist: [
       { name: 'Cecred', status: 'To DM', notes: '' },
@@ -66,9 +66,9 @@ function defaultState() {
       { name: 'Yonka USA', status: 'To DM', notes: '' }
     ],
     tiers: [
-      { name: 'Tier 1', items: [{ label: '', amount: 0 }] },
-      { name: 'Tier 2', items: [{ label: '', amount: 0 }] },
-      { name: 'Tier 3', items: [{ label: '', amount: 0 }] }
+      { name: 'Tier 1', target: 0 },
+      { name: 'Tier 2', target: 0 },
+      { name: 'Tier 3', target: 0 }
     ]
   };
 }
@@ -96,6 +96,27 @@ function load() {
 }
 let state = load();
 ensureCategories();
+ensureBrands();
+ensureTiers();
+
+// give older saved brands the new pay-type fields
+function ensureBrands() {
+  (state.brands || []).forEach(b => {
+    if (b.type === undefined) b.type = 'post';
+    if (b.views === undefined) b.views = 0;
+  });
+}
+// convert older line-item tiers into a single editable target per tier
+function ensureTiers() {
+  if (!Array.isArray(state.tiers)) state.tiers = [];
+  state.tiers.forEach(t => {
+    if (t.target === undefined) {
+      t.target = Array.isArray(t.items) ? t.items.reduce((s, it) => s + (+it.amount || 0), 0) : 0;
+    }
+    delete t.items;
+  });
+  while (state.tiers.length < 3) state.tiers.push({ name: 'Tier ' + (state.tiers.length + 1), target: 0 });
+}
 function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
 
 // keep the category set sensible for existing saved data
@@ -439,34 +460,49 @@ $('#heatmap-btn').addEventListener('click', () => $('#heatmap-section').scrollIn
 /* ===========================================================
    BRAND TRACKER
    =========================================================== */
-function brandExpected() { return state.brands.reduce((s, b) => s + ((+b.done || 0) + (+b.owed || 0)) * (+b.rate || 0), 0); }
-function brandEarned() { return state.brands.reduce((s, b) => s + (+b.done || 0) * (+b.rate || 0), 0); }
+// per-brand pay: CPM uses views ÷ 1000 × rate; per-post uses posts × rate
+function brandEarnedOne(b) {
+  return b.type === 'cpm' ? (+b.views || 0) / 1000 * (+b.rate || 0) : (+b.done || 0) * (+b.rate || 0);
+}
+function brandExpectedOne(b) {
+  return b.type === 'cpm' ? (+b.views || 0) / 1000 * (+b.rate || 0) : ((+b.done || 0) + (+b.owed || 0)) * (+b.rate || 0);
+}
+function brandExpected() { return state.brands.reduce((s, b) => s + brandExpectedOne(b), 0); }
+function brandEarned() { return state.brands.reduce((s, b) => s + brandEarnedOne(b), 0); }
+
 function renderBrands() {
   const body = $('#brand-body'); body.innerHTML = '';
   state.brands.forEach((b, i) => {
-    const earned = (+b.done || 0) * (+b.rate || 0);
-    const expected = ((+b.done || 0) + (+b.owed || 0)) * (+b.rate || 0);
+    const isCpm = b.type === 'cpm';
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><input type="text" data-f="name" placeholder="Brand"/></td>
+      <td><select data-f="type"><option value="post">Per post</option><option value="cpm">CPM (views)</option></select></td>
       <td><input type="number" data-f="done" min="0"/></td>
       <td><input type="number" data-f="owed" min="0"/></td>
       <td><input type="number" data-f="rate" min="0" step="0.01"/></td>
-      <td class="calc">${money(earned)}</td>
-      <td class="calc">${money(expected)}</td>
+      <td><input type="number" data-f="views" min="0"/></td>
+      <td class="calc">${money(brandEarnedOne(b))}</td>
+      <td class="calc">${money(brandExpectedOne(b))}</td>
       <td><button class="row-del">✕</button></td>`;
     tr.querySelector('[data-f="name"]').value = b.name;
+    tr.querySelector('[data-f="type"]').value = b.type;
     tr.querySelector('[data-f="done"]').value = b.done;
     tr.querySelector('[data-f="owed"]').value = b.owed;
     tr.querySelector('[data-f="rate"]').value = b.rate;
+    tr.querySelector('[data-f="views"]').value = b.views;
+    // grey out the fields that don't apply to the chosen pay type
+    tr.querySelector('[data-f="views"]').disabled = !isCpm;
+    tr.querySelector('[data-f="done"]').disabled = isCpm;
+    tr.querySelector('[data-f="owed"]').disabled = isCpm;
+    tr.querySelector('[data-f="rate"]').placeholder = isCpm ? '$/1K' : '$/post';
+
+    tr.querySelector('[data-f="type"]').addEventListener('change', e => { b.type = e.target.value; save(); renderBrands(); });
     tr.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => {
       const f = inp.dataset.f; b[f] = f === 'name' ? inp.value : (parseFloat(inp.value) || 0);
-      // recompute THIS row live (without rebuilding the table, so focus stays)
-      const e = (+b.done || 0) * (+b.rate || 0);
-      const x = ((+b.done || 0) + (+b.owed || 0)) * (+b.rate || 0);
       const calc = tr.querySelectorAll('.calc');
-      calc[0].textContent = money(e);
-      calc[1].textContent = money(x);
+      calc[0].textContent = money(brandEarnedOne(b));
+      calc[1].textContent = money(brandExpectedOne(b));
       save(); renderBrandTotals();
     }));
     tr.querySelector('.row-del').addEventListener('click', () => { state.brands.splice(i, 1); save(); renderBrands(); });
@@ -478,7 +514,7 @@ function renderBrandTotals() {
   $('#brand-total').textContent = money(brandExpected()) + ' EXPECTED';
   updateTierTotals();
 }
-$('#add-brand').addEventListener('click', () => { state.brands.push({ name: '', done: 0, owed: 0, rate: 0 }); save(); renderBrands(); });
+$('#add-brand').addEventListener('click', () => { state.brands.push({ name: '', type: 'post', done: 0, owed: 0, rate: 0, views: 0 }); save(); renderBrands(); });
 
 /* ===========================================================
    CPM ESTIMATOR — view-based pay
@@ -547,22 +583,20 @@ $('#add-pitch').addEventListener('click', () => { state.pitchlist.push({ name: '
 /* ===========================================================
    INCOME TIERS (accumulating)
    =========================================================== */
-function tierSub(t) { return t.items.reduce((s, it) => s + (+it.amount || 0), 0); }
-
-// update only the displayed totals/bars (keeps inputs alive so you can keep typing)
+// update only the displayed totals/bars (keeps the input alive so you can keep typing)
 function updateTierTotals() {
   const earned = brandEarned();
   const ci = $('#current-income'); if (ci) ci.textContent = money(earned) + ' SO FAR';
   const cards = document.querySelectorAll('#tiers .tier');
   let cum = 0;
   state.tiers.forEach((tier, i) => {
-    cum += tierSub(tier);
+    cum += (+tier.target || 0);
     const total = cum;
     const pct = total > 0 ? Math.min(100, Math.round(earned / total * 100)) : 0;
     const card = cards[i]; if (!card) return;
     card.querySelector('.tier-total').innerHTML = `${money(total)}<small>CUMULATIVE GOAL</small>`;
     card.querySelector('.tier-bar > span').style.width = pct + '%';
-    card.querySelector('.tier-meta').textContent = `${pct}% reached · adds ${money(tierSub(tier))}`;
+    card.querySelector('.tier-meta').textContent = `${pct}% of goal reached`;
   });
 }
 
@@ -572,29 +606,24 @@ function renderTiers() {
   $('#current-income').textContent = money(earned) + ' SO FAR';
   let cum = 0;
   state.tiers.forEach(tier => {
-    cum += tierSub(tier);
+    cum += (+tier.target || 0);
     const total = cum;
     const pct = total > 0 ? Math.min(100, Math.round(earned / total * 100)) : 0;
     const div = document.createElement('div'); div.className = 'tier';
     div.innerHTML = `
-      <h3>${tier.name}</h3>
+      <h3 class="tier-name" contenteditable="true" spellcheck="false"></h3>
+      <label class="tier-label">THIS TIER'S TARGET ($)</label>
+      <input class="tier-input" type="number" min="0" step="1" placeholder="0"/>
       <div class="tier-total">${money(total)}<small>CUMULATIVE GOAL</small></div>
       <div class="tier-bar"><span style="width:${pct}%"></span></div>
-      <div class="tier-meta">${pct}% reached · adds ${money(tierSub(tier))}</div>
-      <div class="tier-items"></div>
-      <button class="tier-add">＋ add line</button>`;
-    const itemsWrap = div.querySelector('.tier-items');
-    tier.items.forEach((it, ii) => {
-      const row = document.createElement('div'); row.className = 'tier-item';
-      row.innerHTML = `<input type="text" placeholder="Source"/><input type="number" min="0" step="0.01" placeholder="0"/><button class="row-del">✕</button>`;
-      const [txt, amt] = row.querySelectorAll('input');
-      txt.value = it.label; amt.value = it.amount;
-      txt.addEventListener('input', () => { it.label = txt.value; save(); });
-      amt.addEventListener('input', () => { it.amount = parseFloat(amt.value) || 0; save(); updateTierTotals(); });
-      row.querySelector('.row-del').addEventListener('click', () => { tier.items.splice(ii, 1); save(); renderTiers(); });
-      itemsWrap.appendChild(row);
-    });
-    div.querySelector('.tier-add').addEventListener('click', () => { tier.items.push({ label: '', amount: 0 }); save(); renderTiers(); });
+      <div class="tier-meta">${pct}% of goal reached</div>`;
+    const nameEl = div.querySelector('.tier-name');
+    nameEl.textContent = tier.name;
+    nameEl.addEventListener('blur', () => { tier.name = nameEl.textContent.trim(); save(); });
+    nameEl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); nameEl.blur(); } });
+    const inp = div.querySelector('.tier-input');
+    inp.value = tier.target;
+    inp.addEventListener('input', () => { tier.target = parseFloat(inp.value) || 0; save(); updateTierTotals(); });
     wrap.appendChild(div);
   });
 }

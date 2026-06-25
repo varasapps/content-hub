@@ -213,9 +213,19 @@ input, button, select { font-family: inherit; }
 .row-del { background: none; border: none; cursor: pointer; color: var(--muted); font-weight: 800; }
 .row-del:hover { color: var(--red); }
 
+.data-table input:disabled { background: #efe2e9; color: #b6a6ae; cursor: not-allowed; }
+
 /* ============ TIERS ============ */
-.tier { background: var(--panel-2); border: 3px solid var(--line); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.tier { background: var(--panel-2); border: 3px solid var(--line); padding: 14px; display: flex; flex-direction: column; gap: 8px; }
 .tier h3 { font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; }
+.tier-name { outline: none; }
+.tier-name:focus { background: var(--panel); }
+.tier-label { font-size: .6rem; font-weight: 800; letter-spacing: .06em; color: var(--muted); }
+.tier-input {
+  font-family: 'Space Mono', monospace; font-size: 1.7rem; font-weight: 700;
+  border: 3px solid var(--line); background: #fff; padding: 6px 10px; color: var(--ink); width: 100%;
+}
+.tier-input:focus { outline: none; background: var(--panel); }
 .tier-total { font-family: 'Space Mono', monospace; font-size: 1.6rem; font-weight: 700; }
 .tier-total small { display: block; font-size: .62rem; color: var(--muted); font-weight: 700; letter-spacing: .05em; }
 .tier-bar { height: 12px; border: 3px solid var(--line); background: #fff; }
